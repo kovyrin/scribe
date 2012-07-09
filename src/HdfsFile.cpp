@@ -429,33 +429,30 @@ void HdfsFile::deleteFile() {
   LOG_OPER("[hdfs] deleteFile %s", filename.c_str());
 }
 
-void HdfsFile::listImpl(const std::string& path,
-                        std::vector<std::string>& _return) {
-  if (!fileSys) {
-    return;
-  }
+void HdfsFile::listImpl(const std::string& path, std::vector<std::string>& _return) {
+  if (!fileSys) return;
 
   int value = hdfsExists(fileSys, path.c_str());
-  if (value == -1) {
-    return;
-  } else {
-    int numEntries = 0;
-    hdfsFileInfo* pHdfsFileInfo = 0;
-    pHdfsFileInfo = hdfsListDirectory(fileSys, path.c_str(), &numEntries);
-    if (pHdfsFileInfo) {
-      for(int i = 0; i < numEntries; i++) {
-        char* pathname = pHdfsFileInfo[i].mName;
-        char* filename = rindex(pathname, '/');
-        if (filename != NULL) {
-          _return.push_back(filename+1);
-        }
-      }
-      hdfsFreeFileInfo(pHdfsFileInfo, numEntries);
-    // A NULL indicates error
-    } else {
-      throw std::runtime_error("hdfsListDirectory call failed");
+  if (value == -1) return;
+
+  int numEntries = 0;
+  hdfsFileInfo* pHdfsFileInfo = hdfsListDirectory(fileSys, path.c_str(), &numEntries);
+  if (!pHdfsFileInfo) {
+    // If directory is empty
+    if (errno == 0) return;
+
+    // Something is wrong here
+    throw std::runtime_error("hdfsListDirectory call failed");
+  }
+
+  for (int i = 0; i < numEntries; i++) {
+    char* pathname = pHdfsFileInfo[i].mName;
+    char* filename = rindex(pathname, '/');
+    if (filename != NULL) {
+      _return.push_back(filename + 1);
     }
   }
+  hdfsFreeFileInfo(pHdfsFileInfo, numEntries);
 }
 
 long HdfsFile::readNext(std::string& _return) {
